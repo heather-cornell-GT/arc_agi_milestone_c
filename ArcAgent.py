@@ -108,8 +108,7 @@ class ArcAgent:
             operation = rule_name.replace("top_bottom_", "")
             return self.compare_halves(grid, "top_bottom", operation)
 
-
-        if rule_name == "mirror_tile":
+        if rule_name in ("tile", "scale", "mirror_tile"):
             return self.resize_grid_by_factor(grid, rule_name)
         if rule_name == "separating_xor":
             print('placeholder for 3428a4f5')
@@ -186,7 +185,6 @@ class ArcAgent:
 
 ####learning colors???
     #how to learn when colors are just swapped
-
     def learn_color_map(self, training, rule_name):
         """
         learns basic color swapping, like every yellow becomes a red, etc.
@@ -220,11 +218,9 @@ class ArcAgent:
 
         return result
 
-
     ###################################
     #MILESTONE C FUNCTIONS
     ###################################
-
     def background(self, grid):
         #step 1: if there is any black, treat it as the background
         if (grid == 0).any():
@@ -263,19 +259,22 @@ class ArcAgent:
         if len(factors) != 1:
             return None
         factor = factors.pop()
-
-        #(1,1) means the output is same size as input so skip those problems
+        #(1,1) means the output is same size as input
         return None if factor == (1, 1) else factor
 
 
-    def resize_grid_by_factor(self, grid, type):
+    def resize_grid_by_factor(self, grid, rule):
         ####
-        #module 4: grab the 'factor' from the trainig pairs and resize the grid with the factor instead of assuming its 2x2
+        #module 4: grab the 'factor' from the training pairs and resize the grid with the factor instead of assuming its 2x2
         #####
         if self.factor == None:
             return None
         rows, cols = self.factor
         print(f'rows: {rows}, cols: {cols}')
+        if rule == "tile":
+            return np.tile(grid, (rows, cols))
+        if rule == "scale":
+            return np.kron(grid, np.ones((rows, cols), dtype=grid.dtype))
         grid_rows = []
         for x in range(rows):
             pixel_row = []
@@ -294,3 +293,16 @@ class ArcAgent:
     def split_grids(self, grid):
     ##dividing the grid into multiple independent grids
         print('test')
+        background = self.background(grid)
+        color_in_each_row, color_in_each_col = [],[]
+        num_rows, num_cols = grid.shape[0], grid.shape[1]
+
+        for row in range(num_rows):
+            first = int(grid[row, 0])
+            whole_row_same = (grid[row] == first).all()  # every cell in row r equals its first cell?
+            if first != background and whole_row_same:
+                if first not in color_in_each_row:
+                    color_in_each_row[first] = []  # first time we see this color: start a list
+                color_in_each_row[first].append(row)
+
+
