@@ -103,9 +103,10 @@ class ArcAgent:
             operation = rule_name.replace("top_bottom_", "")
             return self.compare_halves(grid, "top_bottom", operation)
         if rule_name == "mirror_tile":
-            print('mirror_tile test') #placeholder for mirror tile function
+            return np.block([[grid, np.fliplr(grid)], [np.flipud(grid), np.rot90(grid, 2)]])
+        if rule_name == "separating_xor":
+            print('placeholder for 3428a4f5')
         return None
-
 
     def rule_works(self, training, rule_name):
         """
