@@ -64,6 +64,8 @@ class ArcAgent:
 
         test_input = arc_problem.test_set().get_input_data().data()
 
+        self.factor = self.find_factor_value(training)
+
         #testing out each of the rules defined earlier one by one
         for rule_name in self.rules:
             if self.rule_works(training, rule_name): #check if the rules by themself give the correct answer
@@ -223,16 +225,48 @@ class ArcAgent:
     #MILESTONE C FUNCTIONS
     ###################################
 
+    def background(self, grid):
+        #step 1: if there is any black, treat it as the background
+        if (grid == 0).any():
+            return 0
+        #step 2: no black in the grid, so get a count of the other colors in the grid
+        color_counts = {}
+        for row in grid:
+            for pixel in row:
+                color = int(pixel)
+                if color in color_counts:
+                    color_counts[color] += 1
+                else:
+                    color_counts[color] = 1
+
+        # step 3: find color with the biggest color count
+        most_color, color_count = None, 0
+        for color, count in color_counts.items():
+            if count > color_count:
+                most_color, color_count = color, count
+        return most_color
+
     ##module 4 - scaling and tiles
     def find_factor_value(self,training_set):
         """output size / input size, but only if every training pair is the same"""
-        factors = {}
+        factors = set()
         #62c24649: train_input.shape = (3, 3), train_output.shape = (6, 6)
         for train_input, train_output in training_set:
             #62c24649: 6 % 3 = 0 and 6 % 3 = 0  so  both 0 (False), so keep going
             #3de23699: input (7, 7), output (3, 3) -> 3 % 7 = 3 (True), return None
             if train_output.shape[0] % train_input.shape[0] or train_output.shape[1] % train_input.shape[1]:
                 return None
+
+            #62c24649: (6 // 3, 6 // 3) = (2, 2)  ,, factors = {(2, 2)}
+            factors.add((train_output.shape[0] // train_input.shape[0], train_output.shape[1] // train_input.shape[1]))
+
+        if len(factors) != 1:
+            return None
+        factor = factors.pop()
+
+        #(1,1) means the output is same size as input so skip those problems
+        return None if factor == (1, 1) else factor
+
 
     def resize_grid_by_factor(self, grid, type):
         ####
@@ -254,3 +288,9 @@ class ArcAgent:
                 pixel_row.append(block)
             grid_rows.append(np.hstack(pixel_row))
         return np.vstack(grid_rows)
+
+
+    ##module 6 - grid partitioning
+    def split_grids(self, grid):
+    ##dividing the grid into multiple independent grids
+        print('test')
