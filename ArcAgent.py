@@ -13,6 +13,8 @@ class ArcAgent:
                 making rule sets so that i can apply them easier later. 
                 this is giving the agent a 'helping hand'
                 """
+        self.debug = True
+        self.current_rule = None
         self.rules = [
             "rotate_90","rotate_180","rotate_270","flip_up_down",
             "flip_left_right","transpose","crop_nonzero","left_right_and",
@@ -85,6 +87,7 @@ class ArcAgent:
         """
         apply each rule to the grid and if it works, return it
         """
+        self.current_rule = rule_name
         if rule_name == "no_change":
             return grid.copy()
         if rule_name == "rotate_90":
@@ -221,6 +224,12 @@ class ArcAgent:
     ###################################
     #MILESTONE C FUNCTIONS
     ###################################
+    def log(self, *things):
+        """print only when debugging is on (and only for debug_problem, if one is set)."""
+        if not self.debug:
+            return
+        print(f"  [{self.current_rule}]", *things)
+
     def background(self, grid):
         #step 1: if there is any black, treat it as the background
         if (grid == 0).any():
@@ -251,13 +260,16 @@ class ArcAgent:
             #62c24649: 6 % 3 = 0 and 6 % 3 = 0  so  both 0 (False), so keep going
             #3de23699: input (7, 7), output (3, 3) -> 3 % 7 = 3 (True), return None
             if train_output.shape[0] % train_input.shape[0] or train_output.shape[1] % train_input.shape[1]:
+                self.log(f"infer_factor: {train_input.shape} to  {train_output.shape}  is not whole so its not a factor")
                 return None
 
             #62c24649: (6 // 3, 6 // 3) = (2, 2)  ,, factors = {(2, 2)}
             factors.add((train_output.shape[0] // train_input.shape[0], train_output.shape[1] // train_input.shape[1]))
 
         if len(factors) != 1:
+            self.log("infer_factor: pairs disagree:", factors)
             return None
+
         factor = factors.pop()
         #(1,1) means the output is same size as input
         return None if factor == (1, 1) else factor
@@ -270,6 +282,7 @@ class ArcAgent:
         if self.factor == None:
             return None
         rows, cols = self.factor
+        self.log(f"resize_by_factor: {rule} {grid.shape} by {self.factor}")
         print(f'rows: {rows}, cols: {cols}')
         if rule == "tile":
             return np.tile(grid, (rows, cols))
@@ -294,15 +307,53 @@ class ArcAgent:
     ##dividing the grid into multiple independent grids
         print('test')
         background = self.background(grid)
-        color_in_each_row, color_in_each_col = [],[]
+        color_in_each_row, color_in_each_col = {},{}
         num_rows, num_cols = grid.shape[0], grid.shape[1]
 
+        ##
         for row in range(num_rows):
             first = int(grid[row, 0])
-            whole_row_same = (grid[row] == first).all()  # every cell in row r equals its first cell?
+            whole_row_same = (grid[row] == first).all()  #every cell in row r equals its first cell????
             if first != background and whole_row_same:
                 if first not in color_in_each_row:
-                    color_in_each_row[first] = []  # first time we see this color: start a list
+                    color_in_each_row[first] = []  #first time we see this color: start a list
                 color_in_each_row[first].append(row)
 
+        for col in range(grid.shape[1]):
+            first = int(grid[0, col])
+            whole_col_same = (grid[:, col] == first).all()
+            if first != background and whole_col_same:
+                if first not in color_in_each_col:
+                    color_in_each_col[first] = []
+                color_in_each_col[first].append(col)
+
+        self.log(f"split_panels: grid {grid.shape}, background {background}, divider rows {color_in_each_row}, divider cols {color_in_each_col}")
+
+        row_options = list(color_in_each_row.values()) + [[]]
+        col_options = list(color_in_each_col.values()) + [[]]
+
+        for rows in row_options:
+            for cols in col_options:
+                if not rows and not cols:
+                    continue
+
+                #aplit the grid between the dividers
+                panels = []
+                for top, bottom in self.spans(grid.shape[0], rows):
+                    for left, right in self.spans(grid.shape[1], cols):
+                        panels.append(grid[top:bottom, left:right])
+
+                # ---- step 3: only accept the split if every panel is the same size ----
+                #   cf98881b, cols [3]:    widths 3 and 10 -> different sizes, try next option
+                #   cf98881b, cols [4, 9]: three 4x4 panels -> accept
+                shapes = set()
+                for p in panels:
+                    shapes.add(p.shape)
+                if len(panels) >= 2 and len(shapes) == 1 and panels[0].size > 0:
+                    self.log(f"split_panels: rows {rows} cols {cols} -> "
+                             f"{len(panels)} panels of {panels[0].shape}  ACCEPTED")
+                    return panels
+                self.log(f"split_panels: rows {rows} cols {cols} -> panel sizes {shapes}  rejected")
+            self.log("split_panels: no split works")
+            return None
 
