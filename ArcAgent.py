@@ -18,11 +18,14 @@ class ArcAgent:
             "flip_left_right","transpose","crop_nonzero","left_right_and",
             "left_right_or","left_right_nor","top_bottom_and","top_bottom_or",
             "top_bottom_nor","no_change",  ### above are the rules from Milestone A/B
+            ##Module 1 = geometry, Module 2 = color maps, Module 3 = cropping
 
-            ###new rules
-            "mirror_tile"  # 62c24649
+            ##milestone C additions
+            "tile", "scale", "mirror_tile" #Module 4: tiling & scaling;  # 62c24649
 
         ]
+        self.factor = None   #(rows, cols) scale factor, grabbing from the training pairs so we can rescale later
+
 
 
     def make_predictions(self, arc_problem: ArcProblem) -> list[np.ndarray]:
@@ -102,10 +105,13 @@ class ArcAgent:
         if rule_name.startswith("top_bottom_"):
             operation = rule_name.replace("top_bottom_", "")
             return self.compare_halves(grid, "top_bottom", operation)
+
+
         if rule_name == "mirror_tile":
-            return np.block([[grid, np.fliplr(grid)], [np.flipud(grid), np.rot90(grid, 2)]])
+            return self.resize_grid_by_factor(grid, rule_name)
         if rule_name == "separating_xor":
             print('placeholder for 3428a4f5')
+
         return None
 
     def rule_works(self, training, rule_name):
@@ -216,3 +222,24 @@ class ArcAgent:
     ###################################
     #MILESTONE C FUNCTIONS
     ###################################
+
+    def resize_grid_by_factor(self, grid, type):
+        ####
+        #module 4: grab the 'factor' from the trainig pairs and resize the grid with the factor instead of assuming its 2x2
+        #####
+        if self.factor == None:
+            return None
+        rows, cols = self.factor
+        print(f'rows: {rows}, cols: {cols}')
+        grid_rows = []
+        for x in range(rows):
+            pixel_row = []
+            for y in range(cols):
+                block = grid
+                if x % 2 == 1:
+                    block = np.flipud(block)
+                if y % 2 == 1:
+                    block = np.fliplr(block)
+                pixel_row.append(block)
+            grid_rows.append(np.hstack(pixel_row))
+        return np.vstack(grid_rows)
