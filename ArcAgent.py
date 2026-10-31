@@ -23,7 +23,10 @@ class ArcAgent:
             ##Module 1 = geometry, Module 2 = color maps, Module 3 = cropping
 
             ##milestone C additions
-            "tile", "scale", "mirror_tile" #Module 4: tiling & scaling;  # 62c24649
+            "tile", "scale", "mirror_tile", #Module 4: tiling & scaling;  # 62c24649
+            "sep_and", "sep_or", "sep_xor", "sep_nor",  #Module 6: partition on a divider line, then SEARCH the combination rule (and/or/xor/...) against training
+            "sep_nand", "sep_first_only", "sep_last_only",
+            "sep_overlay"
 
         ]
         self.factor = None   #(rows, cols) scale factor, grabbing from the training pairs so we can rescale later
@@ -65,13 +68,19 @@ class ArcAgent:
             training.append((train_input, train_output))
 
         test_input = arc_problem.test_set().get_input_data().data()
+        self.current_problem = arc_problem.problem_name()
+        self.current_rule = "setup"
+        self.log(f"##### {self.current_problem}: {len(training)} training pairs, test input shape {test_input.shape}#####")
 
         self.factor = self.find_factor_value(training)
+        self.current_rule = "setup"
+        self.log("inferred factor:", self.factor)
 
         #testing out each of the rules defined earlier one by one
         for rule_name in self.rules:
             if self.rule_works(training, rule_name): #check if the rules by themself give the correct answer
                 answer = self.apply_rule(rule_name, test_input)
+                self.log("PASSES every training pair by itself")
                 self.add_answer(predictions, answer)
             else:
                 color_map = self.learn_color_map(training, rule_name)
@@ -113,8 +122,10 @@ class ArcAgent:
 
         if rule_name in ("tile", "scale", "mirror_tile"):
             return self.resize_grid_by_factor(grid, rule_name)
-        if rule_name == "separating_xor":
+        if rule_name.startswith("sep_"):
             print('placeholder for 3428a4f5')
+            return self.combine_grids(grid, rule_name.replace("sep_", ""))
+
 
         return None
 
@@ -225,7 +236,7 @@ class ArcAgent:
     #MILESTONE C FUNCTIONS
     ###################################
     def log(self, *things):
-        """print only when debugging is on (and only for debug_problem, if one is set)."""
+        """print only when debugging is on"""
         if not self.debug:
             return
         print(f"  [{self.current_rule}]", *things)
@@ -350,10 +361,35 @@ class ArcAgent:
                 for p in panels:
                     shapes.add(p.shape)
                 if len(panels) >= 2 and len(shapes) == 1 and panels[0].size > 0:
-                    self.log(f"split_panels: rows {rows} cols {cols} -> "
-                             f"{len(panels)} panels of {panels[0].shape}  ACCEPTED")
+                    self.log(f"split_panels: rows {rows} cols {cols} -> {len(panels)} panels of {panels[0].shape}  ACCEPTED")
                     return panels
                 self.log(f"split_panels: rows {rows} cols {cols} -> panel sizes {shapes}  rejected")
             self.log("split_panels: no split works")
             return None
+
+    def spans(self, size, dividers):
+        """the leftovers from removing diviers in the grid
+          like cf98881b columns or 3428a4f5 rows)
+          set the edge of the grid as a divider so it knows where to stop (if two dividers hit eachother))
+        """
+        result = []
+        start = 0
+        for d in dividers + [size]:
+            if d > start:
+                result.append((start, d))
+            start = d + 1
+        return result
+
+
+    def combine_grids(self, grid, operation):
+        print('test')
+        background = self.background(grid)
+        panels = self.split_grids(grid)
+        if panels is None:
+            return
+
+        filled = [p != background for p in panels]
+        self.log(f"combine_panels: '{operation}' on {len(panels)} panels, filled cells per panel {[int(f.sum()) for f in filled]}")
+
+        
 
