@@ -223,6 +223,17 @@ class ArcAgent:
     #MILESTONE C FUNCTIONS
     ###################################
 
+    ##module 4 - scaling and tiles
+    def find_factor_value(self,training_set):
+        """output size / input size, but only if every training pair is the same"""
+        factors = {}
+        #62c24649: train_input.shape = (3, 3), train_output.shape = (6, 6)
+        for train_input, train_output in training_set:
+            #62c24649: 6 % 3 = 0 and 6 % 3 = 0  so  both 0 (False), so keep going
+            #3de23699: input (7, 7), output (3, 3) -> 3 % 7 = 3 (True), return None
+            if train_output.shape[0] % train_input.shape[0] or train_output.shape[1] % train_input.shape[1]:
+                return None
+
     def resize_grid_by_factor(self, grid, type):
         ####
         #module 4: grab the 'factor' from the trainig pairs and resize the grid with the factor instead of assuming its 2x2
