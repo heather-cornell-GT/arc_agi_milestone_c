@@ -114,11 +114,11 @@ class ArcAgent:
         if rule_name == "crop_nonzero":
             return self.crop_nonzero(grid)
         if rule_name.startswith("left_right_"):
-            operation = rule_name.replace("left_right_", "")
-            return self.compare_halves(grid, "left_right", operation)
+            modification = rule_name.replace("left_right_", "")
+            return self.compare_halves(grid, "left_right", modification)
         if rule_name.startswith("top_bottom_"):
-            operation = rule_name.replace("top_bottom_", "")
-            return self.compare_halves(grid, "top_bottom", operation)
+            modification = rule_name.replace("top_bottom_", "")
+            return self.compare_halves(grid, "top_bottom", modification)
 
         if rule_name in ("tile", "scale", "mirror_tile"):
             return self.resize_grid_by_factor(grid, rule_name)
@@ -169,7 +169,7 @@ class ArcAgent:
 
         return grid[first_row:last_row + 1, first_col:last_col + 1].copy()
 ####crop nonzero
-    def compare_halves(self, grid, direction, operation):
+    def compare_halves(self, grid, direction, modification):
         """
         split the grid into two parts and see if they compare at all through ands ors nors
         """
@@ -189,9 +189,9 @@ class ArcAgent:
 
         first_filled = first_half != 0
         second_filled = second_half != 0
-        if operation == "and":  #filled in BOTH halves
+        if modification == "and":  #filled in BOTH halves
             result = first_filled & second_filled
-        elif operation == "or":  #filled in EITHER half
+        elif modification == "or":  #filled in EITHER half
             result = first_filled | second_filled
         else:  #"nor": filled in NEITHER half
             result = ~(first_filled | second_filled)
@@ -381,7 +381,8 @@ class ArcAgent:
         return result
 
 
-    def combine_grids(self, grid, operation):
+    def combine_grids(self, grid, modification):
+        ###module 6 trap --
         print('test')
         background = self.background(grid)
         panels = self.split_grids(grid)
@@ -389,7 +390,27 @@ class ArcAgent:
             return
 
         filled = [p != background for p in panels]
-        self.log(f"combine_panels: '{operation}' on {len(panels)} panels, filled cells per panel {[int(f.sum()) for f in filled]}")
+        self.log(f"combine_panels: '{modification}' on {len(panels)} panels, filled cells per panel {[int(f.sum()) for f in filled]}")
 
-        
+        if modification == "and":
+            return np.logical_and.reduce(filled).astype(int)
+        if modification == "or":
+            return np.logical_or.reduce(filled).astype(int)
+        if modification == "xor":
+            return (np.sum(filled, axis=0) % 2 == 1).astype(int)
+        if modification == "nor":
+            return (~np.logical_or.reduce(filled)).astype(int)
+        if modification == "nand":
+            return (~np.logical_and.reduce(filled)).astype(int)
+        if modification == "first_only":
+            return (filled[0] & ~np.logical_or.reduce(filled[1:])).astype(int)
+        if modification == "last_only":
+            return (filled[-1] & ~np.logical_or.reduce(filled[:-1])).astype(int)
+        if modification == "overlay":
+            result = panels[0].copy()
+            for p in panels[1:]:
+                empty = (result == background) & (p != background)
+                result[empty] = p[empty]
+            return result
+        return None
 
