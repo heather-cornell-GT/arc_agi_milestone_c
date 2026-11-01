@@ -1,5 +1,6 @@
 import numpy as np
 from ArcProblem import ArcProblem
+from scipy import ndimage
 from ArcData import ArcData
 from ArcSet import ArcSet
 
@@ -26,7 +27,7 @@ class ArcAgent:
             "tile", "scale", "mirror_tile", #Module 4: tiling & scaling;  # 62c24649
             "sep_and", "sep_or", "sep_xor", "sep_nor",  #Module 6: partition on a divider line, then SEARCH the combination rule (and/or/xor/...) against training
             "sep_nand", "sep_first_only", "sep_last_only",
-            "sep_overlay"
+            "sep_overlay", "fill_enclosed"
 
         ]
         self.factor = None   #(rows, cols) scale factor, grabbing from the training pairs so we can rescale later
@@ -123,8 +124,10 @@ class ArcAgent:
         if rule_name in ("tile", "scale", "mirror_tile"):
             return self.resize_grid_by_factor(grid, rule_name)
         if rule_name.startswith("sep_"):
-            print('placeholder for 3428a4f5')
+            #print('placeholder for 3428a4f5')
             return self.combine_grids(grid, rule_name.replace("sep_", ""))
+        if rule_name == "fill_enclosed":
+            return self.fill_enclosed(grid)
 
 
         return None
@@ -316,7 +319,7 @@ class ArcAgent:
     ##module 6 - grid partitioning
     def split_grids(self, grid):
     ##dividing the grid into multiple independent grids
-        print('test')
+        #print('test')
         background = self.background(grid)
         color_in_each_row, color_in_each_col = {},{}
         num_rows, num_cols = grid.shape[0], grid.shape[1]
@@ -383,7 +386,7 @@ class ArcAgent:
 
     def combine_grids(self, grid, modification):
         ###module 6 trap --
-        print('test')
+        #print('test')
         background = self.background(grid)
         panels = self.split_grids(grid)
         if panels is None:
@@ -414,3 +417,16 @@ class ArcAgent:
             return result
         return None
 
+    #Module 5: connected components
+
+    def fill_enclosed(self, grid):
+        """
+        for pixels surrounded by color pixels
+        """
+        background = self.background(grid)
+        borders = grid != background
+        enclosed = ndimage.binary_fill_holes(borders) & ~borders
+        self.log(f"fill_enclosed: bg {background}, {int(borders.sum())} wall cells, {int(enclosed.sum())} enclosed cells marked 10")
+        result = grid.copy()
+        result[enclosed] = 10
+        return result
