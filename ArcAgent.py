@@ -27,7 +27,9 @@ class ArcAgent:
             "tile", "scale", "mirror_tile", #Module 4: tiling & scaling;  # 62c24649
             "sep_and", "sep_or", "sep_xor", "sep_nor",  #Module 6: partition on a divider line, then SEARCH the combination rule (and/or/xor/...) against training
             "sep_nand", "sep_first_only", "sep_last_only",
-            "sep_overlay", "fill_enclosed"
+            "sep_overlay",
+            "shapes_with_holes_4", "shapes_with_holes_8",  #Module 5: connected components, adjacency searched
+            "fill_enclosed" #Module 5 (+ Module 8's "reserved placeholder" idea)
 
         ]
         self.factor = None   #(rows, cols) scale factor, grabbing from the training pairs so we can rescale later
@@ -128,7 +130,8 @@ class ArcAgent:
             return self.combine_grids(grid, rule_name.replace("sep_", ""))
         if rule_name == "fill_enclosed":
             return self.fill_enclosed(grid)
-
+        if rule_name.startswith("shapes_with_holes_"):
+            return self.find_shapes_with_holes(grid, int(rule_name[-1]))
 
         return None
 
@@ -425,8 +428,47 @@ class ArcAgent:
         """
         background = self.background(grid)
         borders = grid != background
-        enclosed = ndimage.binary_fill_holes(borders) & ~borders
-        self.log(f"fill_enclosed: bg {background}, {int(borders.sum())} wall cells, {int(enclosed.sum())} enclosed cells marked 10")
+        bordersplusinside = ndimage.binary_fill_holes(borders) & ~borders
+        self.log(f"fill_enclosed: bg {background}, {int(borders.sum())} wall cells, {int(bordersplusinside.sum())} enclosed cells marked 10")
         result = grid.copy()
-        result[enclosed] = 10
+        result[bordersplusinside] = 10
+        return result
+
+    def find_shapes_with_holes(self, grid, connectivity):
+        ### for objects with the same color that are wrapped around a hole
+        ### for the scipy package, it uses 1 and 2. 1 = up down left and right touching, and 2 = those four plus the 4 diagonals.
+
+        background = self.background(grid)
+
+        if connectivity == 4:
+            neighbours = 1
+        else:
+            neighbours = 2
+        binary_structure = ndimage.generate_binary_structure(2, neighbours)
+
+        colors = np.unique(grid)                       # [1, 9]
+        print(f'colors: {colors}')
+        for color in colors:
+            if color == background:
+                continue
+
+            CURRENT_color = (grid == color)
+
+            #labels gives every shape its own number and puts it in labels, and count is the count of how many unique shapes there are
+            labels, count = ndimage.label(CURRENT_color, structure=binary_structure)
+
+            shapes_with_holes, result = 0, grid.copy()
+            for shape_number in range(1, count + 1):
+                shape = (labels == shape_number)
+
+                #fill any hole in the shape, then compare cell counts. so if the count is different,m the shape had a hole
+                filled = ndimage.binary_fill_holes(shape)
+                cells_before_fill = shape.sum()
+                cells_after_fill = filled.sum()
+
+                if cells_after_fill > cells_before_fill:
+                    result[shape] = 10  #learn_color_map turns 10 ti 8
+                    shapes_with_holes += 1
+
+            self.log(f"mark_holey_shapes ({connectivity}-conn): color {int(color)} has {count} shape(s), {shapes_with_holes} with a hole")
         return result
